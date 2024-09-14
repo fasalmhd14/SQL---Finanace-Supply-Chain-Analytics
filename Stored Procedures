@@ -1,0 +1,130 @@
+# MARKET BADGE
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `get_market_badge`(
+		IN in_market varchar(45),
+        IN in_fiscal_year year,
+        OUT out_badge varchar(45)
+)
+BEGIN
+declare Total_sold_quantity int default 0; # was this declaration necessary?
+
+#retrieve total quantity
+select 
+sum(sold_quantity) into Total_sold_quantity
+from 
+fact_sales_monthly s 
+join dim_customer c 
+on s.customer_code = c.customer_code
+where get_fiscal_year(s.date) = in_fiscal_year and c.market = in_market
+group by c.market;
+
+
+# get market badge
+
+if Total_sold_quantity > 5000000 then 
+	set out_badge = "Gold";
+else
+	set out_badge = "Silver";
+end if;
+end
+
+
+# get_monthly_gross_sales_customers_multiple
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `get_monthly_gross_sales_customers_multiple`(
+	in_customer_code text
+    )
+BEGIN
+select 
+s.date, 
+round(sum(sold_quantity*g.gross_price),2) as monthly_gross_sales
+from 
+fact_sales_monthly s 
+join 
+fact_gross_price g
+on s.product_code = g.product_code and 
+g.fiscal_year = get_fiscal_year(s.date)
+where 
+find_in_set(s.customer_code,in_customer_code) > 0
+group by s.date        
+order by s.date asc ;
+END
+
+# get_top_n_customers_by_net_sales
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `get_top_n_customers_by_net_sales`(
+	IN in_market varchar(45),
+    IN in_fiscal_year INT,
+    IN in_top_n INT
+    )
+BEGIN
+select 
+customer, 
+round(sum(net_sales/1000000),2) as net_sales_mln
+from gdb0041.net_sales
+where fiscal_year = in_fiscal_year and 
+market = in_market
+group by customer
+order by net_sales_mln desc
+limit in_top_n ;
+END
+
+# get_top_n_customers_per_division_by_qty_sold
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `get_top_n_customers_per_division_by_qty_sold`(
+IN in_fiscal_year INT,
+IN in_top_n INT
+)
+BEGIN
+with cte1 as 
+(select s.product, p.division,
+sum(sold_quantity) as total_sold_quantity
+from net_sales s
+join dim_product  p
+on s.product_code = p.product_code
+where fiscal_year = in_fiscal_year
+group by s.product, p.division
+order by p.division, total_sold_quantity desc),
+
+cte2 as (select *, dense_rank () over(partition by division order by total_sold_quantity desc) as den_rnk
+from cte1)
+
+select * 
+from cte2
+where den_rnk <= in_top_n ;
+END
+
+
+# `get_top_n_markets_by_net_sales`
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `get_top_n_markets_by_net_sales`(
+	IN in_fiscal_year INT,
+    IN in_top_n INT
+)
+BEGIN
+select 
+market,
+round(sum(net_sales/1000000),2) as net_sales_mln
+from gdb0041.net_sales
+where fiscal_year = in_fiscal_year
+group by market
+order by net_sales_mln desc
+limit in_top_n ;
+END
+
+# get_top_n_products_by_net_sales
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `get_top_n_products_by_net_sales`(
+IN in_fiscal_year INT,
+    IN in_top_n INT
+)
+BEGIN
+select 
+product,
+round(sum(net_sales/1000000),2) as net_sales_mln
+from net_sales
+where fiscal_year = in_fiscal_year
+group by product
+order by net_sales_mln desc
+limit in_top_n;
+END
