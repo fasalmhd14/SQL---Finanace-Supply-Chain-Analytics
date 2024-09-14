@@ -5,9 +5,10 @@ These SQL queries generate reports from a database of around 1.5 million records
 This project helped me to learn the following Topics in SQL AND Particularly MySQL :
 
 - Simple SQL Statements
-- PRIMARY KEYS AND FORIEGN KEYS
-- DATA MODELLING
+- Creating New Tables
 - EXTRACT, TRANSFORMATION AND LOAD
+- PRIMARY KEYS AND FORIEGN KEYS
+- ENTITY RELATIONSHIP DIAGRAMS (ERD)
 - JOINS
 - SUBQUERIES
 - CTES
@@ -17,7 +18,6 @@ This project helped me to learn the following Topics in SQL AND Particularly MyS
 - USER DEFINED FUNCTIONS
 - STORED PROCEDURES
 - VIEWS
-- Creating New Tables
 - WINDOW FUNCTIONS
 - HELPER TABLES
 - DATABASE TRIGGERS
