@@ -19,6 +19,9 @@ This project helped me to learn the following Topics in SQL AND Particularly MyS
 - VIEWS
 - Creating New Tables
 - WINDOW FUNCTIONS
+- HELPER TABLES
+- DATABASE TRIGGERS
+- DATABASE EVENTS
 
 
 * Dataset is not shared due to proprietary rights of Codebasics (Course Provider) 
