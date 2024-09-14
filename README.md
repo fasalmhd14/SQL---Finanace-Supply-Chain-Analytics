@@ -23,5 +23,4 @@ This project helped me to learn the following Topics in SQL AND Particularly MyS
 - DATABASE TRIGGERS
 - DATABASE EVENTS
 
-
-* Dataset is not shared due to proprietary rights of Codebasics (Course Provider) 
+Dataset is not shared due to proprietary rights of Codebasics (Course Provider) 
