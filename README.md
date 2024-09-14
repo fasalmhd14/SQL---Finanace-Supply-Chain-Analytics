@@ -1,6 +1,6 @@
 GUIDED PROJECT: This Project is part of the SQL Module in the Data Analysis Bootcamp by Codebasics.
 
-These SQL queries generate reports from a database of around 1.5 million records, related to Finance and Supply Chain, of a Multinational Hardware Manufacturing Company.
+These SQL queries generate reports from a database of around 1.5 million records, on metrics related to Finance and Supply Chain  like Revenue, Forecsat Accuracy etc., of a Multinational Hardware Manufacturing Company.
 
 This project helped me to learn the following Topics in SQL AND Particularly MySQL :
 
@@ -20,7 +20,5 @@ This project helped me to learn the following Topics in SQL AND Particularly MyS
 - Creating New Tables
 - WINDOW FUNCTIONS
 
-
-These queries generate reports on important Financial and Supply Chain metrics like Revenue, Forecsat Accuracy etc.
 
 * Dataset is not shared due to proprietary rights of Codebasics (Course Provider) 
