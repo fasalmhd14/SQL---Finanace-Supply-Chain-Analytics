@@ -1,0 +1,112 @@
+# Gross Sales View
+
+CREATE 
+    ALGORITHM = UNDEFINED 
+    DEFINER = `root`@`localhost` 
+    SQL SECURITY DEFINER
+VIEW `gross_sales` AS
+    SELECT 
+        `s`.`date` AS `date`,
+        `s`.`fiscal_year` AS `fiscal_year`,
+        `s`.`customer_code` AS `customer_code`,
+        `c`.`customer` AS `customer`,
+        `c`.`market` AS `market`,
+        `s`.`product_code` AS `product_code`,
+        `p`.`product` AS `product`,
+        `p`.`variant` AS `variant`,
+        `s`.`sold_quantity` AS `sold_quantity`,
+        `g`.`gross_price` AS `gross_price`,
+        ROUND((`g`.`gross_price` * `s`.`sold_quantity`),
+                2) AS `gross_price_total`
+    FROM
+        (((`fact_sales_monthly` `s`
+        JOIN `dim_customer` `c` ON ((`s`.`customer_code` = `c`.`customer_code`)))
+        JOIN `dim_product` `p` ON ((`s`.`product_code` = `p`.`product_code`)))
+        JOIN `fact_gross_price` `g` ON (((`s`.`product_code` = `g`.`product_code`)
+            AND (`g`.`fiscal_year` = `s`.`fiscal_year`))))
+
+# Net Sales View
+
+CREATE 
+    ALGORITHM = UNDEFINED 
+    DEFINER = `root`@`localhost` 
+    SQL SECURITY DEFINER
+VIEW `net_sales` AS
+    SELECT 
+        `sales_post_inv_disc`.`date` AS `date`,
+        `sales_post_inv_disc`.`fiscal_year` AS `fiscal_year`,
+        `sales_post_inv_disc`.`customer_code` AS `customer_code`,
+        `sales_post_inv_disc`.`customer` AS `customer`,
+        `sales_post_inv_disc`.`market` AS `market`,
+        `sales_post_inv_disc`.`region` AS `region`,
+        `sales_post_inv_disc`.`product_code` AS `product_code`,
+        `sales_post_inv_disc`.`product` AS `product`,
+        `sales_post_inv_disc`.`variant` AS `variant`,
+        `sales_post_inv_disc`.`sold_quantity` AS `sold_quantity`,
+        `sales_post_inv_disc`.`gross_price` AS `gross_price`,
+        `sales_post_inv_disc`.`gross_price_total` AS `gross_price_total`,
+        `sales_post_inv_disc`.`pre_invoice_discount_pct` AS `pre_invoice_discount_pct`,
+        `sales_post_inv_disc`.`net_invoice_sales` AS `net_invoice_sales`,
+        `sales_post_inv_disc`.`post_inv_disc_pct` AS `post_inv_disc_pct`,
+        ROUND(((1 - `sales_post_inv_disc`.`post_inv_disc_pct`) * `sales_post_inv_disc`.`net_invoice_sales`),
+                2) AS `net_sales`
+    FROM
+        `sales_post_inv_disc`
+
+#   sales_post_inv_disc view
+
+CREATE 
+    ALGORITHM = UNDEFINED 
+    DEFINER = `root`@`localhost` 
+    SQL SECURITY DEFINER
+VIEW `sales_post_inv_disc` AS
+    SELECT 
+        `sa`.`date` AS `date`,
+        `sa`.`fiscal_year` AS `fiscal_year`,
+        `sa`.`customer_code` AS `customer_code`,
+        `sa`.`customer` AS `customer`,
+        `sa`.`market` AS `market`,
+        `sa`.`region` AS `region`,
+        `sa`.`product_code` AS `product_code`,
+        `sa`.`product` AS `product`,
+        `sa`.`variant` AS `variant`,
+        `sa`.`sold_quantity` AS `sold_quantity`,
+        `sa`.`gross_price` AS `gross_price`,
+        `sa`.`gross_price_total` AS `gross_price_total`,
+        `sa`.`pre_invoice_discount_pct` AS `pre_invoice_discount_pct`,
+        (`sa`.`gross_price_total` - (`sa`.`gross_price_total` * `sa`.`pre_invoice_discount_pct`)) AS `net_invoice_sales`,
+        (`po`.`discounts_pct` + `po`.`other_deductions_pct`) AS `post_inv_disc_pct`
+    FROM
+        (`sales_pre_inv_disc` `sa`
+        JOIN `fact_post_invoice_deductions` `po` ON (((`sa`.`product_code` = `po`.`product_code`)
+            AND (`sa`.`date` = `po`.`date`)
+            AND (`sa`.`customer_code` = `po`.`customer_code`))))
+
+# sales_pre_inv_disc View
+
+CREATE 
+    ALGORITHM = UNDEFINED 
+    DEFINER = `root`@`localhost` 
+    SQL SECURITY DEFINER
+VIEW `net_sales` AS
+    SELECT 
+        `sales_post_inv_disc`.`date` AS `date`,
+        `sales_post_inv_disc`.`fiscal_year` AS `fiscal_year`,
+        `sales_post_inv_disc`.`customer_code` AS `customer_code`,
+        `sales_post_inv_disc`.`customer` AS `customer`,
+        `sales_post_inv_disc`.`market` AS `market`,
+        `sales_post_inv_disc`.`region` AS `region`,
+        `sales_post_inv_disc`.`product_code` AS `product_code`,
+        `sales_post_inv_disc`.`product` AS `product`,
+        `sales_post_inv_disc`.`variant` AS `variant`,
+        `sales_post_inv_disc`.`sold_quantity` AS `sold_quantity`,
+        `sales_post_inv_disc`.`gross_price` AS `gross_price`,
+        `sales_post_inv_disc`.`gross_price_total` AS `gross_price_total`,
+        `sales_post_inv_disc`.`pre_invoice_discount_pct` AS `pre_invoice_discount_pct`,
+        `sales_post_inv_disc`.`net_invoice_sales` AS `net_invoice_sales`,
+        `sales_post_inv_disc`.`post_inv_disc_pct` AS `post_inv_disc_pct`,
+        ROUND(((1 - `sales_post_inv_disc`.`post_inv_disc_pct`) * `sales_post_inv_disc`.`net_invoice_sales`),
+                2) AS `net_sales`
+    FROM
+        `sales_post_inv_disc`
+
