@@ -1,0 +1,428 @@
+# FINANCE ANALYTICS 
+
+# Generate a report of Individual product sales (aggregated on a monthly basis at the product code level) for croma India for FY =2021 
+# The report should have the following fields
+# 1. Month 
+# 2. Product Name
+# 3. Variant
+# 4. Sold Quantity
+# 5. Gross Price per item 
+# 6. Gross price Total
+
+
+# fiscal year without using user defined functions 
+SELECT * FROM gdb0041.fact_sales_monthly
+where customer_code = 90002002 and
+year(date_add(date, interval 4 MONTH))= 2021
+order by date asc;
+
+# fiscal year  with user defined function 
+SELECT date, product_code, customer_code, sold_quantity, get_fiscal_year(date) as fiscal_year  # calulcated column - fiscal year
+FROM gdb0041.fact_sales_monthly
+where customer_code = 90002002 and 
+get_fiscal_year(date) = 2021
+order by date asc;
+
+
+# fiscal_quarter f
+SELECT * FROM gdb0041.fact_sales_monthly
+where customer_code = 90002002 and    # multiple column conditions or filters
+get_fiscal_year(date) = 2021 and 
+get_fiscal_quarter(date) = "Q4"
+order by date asc;
+
+# product name and variant
+select s.date, s.product_code,s.sold_quantity,p.product,p.variant from 
+fact_sales_monthly s 
+join dim_product p 
+on s.product_code = p.product_code
+where customer_code = 90002002 and 
+get_fiscal_year(date) = 2021
+order by date asc;
+
+#gross price 
+select s.date, s.product_code,
+p.product,p.variant ,s.sold_quantity, 
+g.gross_price from 
+fact_sales_monthly s 
+join dim_product p 
+on s.product_code = p.product_code
+join fact_gross_price g
+on s.product_code = g.product_code and
+   g.fiscal_year = get_fiscal_year(s.date)  # joining on more than one column 
+where customer_code = 90002002 and 
+get_fiscal_year(date) = 2021
+order by date asc;
+
+#gross_price_total
+select s.date, s.product_code,
+p.product,p.variant ,s.sold_quantity, 
+g.gross_price, round(gross_price*s.sold_quantity,2) as gross_price_total  from 
+fact_sales_monthly s 
+join dim_product p 
+on s.product_code = p.product_code
+join fact_gross_price g
+on s.product_code = g.product_code and
+   g.fiscal_year = get_fiscal_year(s.date)  # joining on more than one column 
+where customer_code = 90002002 and 
+get_fiscal_year(date) = 2021
+order by date asc; 
+
+
+# Aggregate monthly gross sales report for Croma India - the report should have the following :
+# Month
+# Total Gross sales amount to Croma India in a respective month (for all the products)
+
+select 
+s.date, 
+round(sum(sold_quantity*g.gross_price),2) as monthly_gross_sales
+from 
+fact_sales_monthly s 
+join 
+fact_gross_price g
+on s.product_code = g.product_code and 
+g.fiscal_year = get_fiscal_year(s.date)
+where customer_code = 90002002
+group by s.date       # can you group by an aggregate through more than one column?  
+order by s.date asc ;
+
+
+# Generate a yearly report for Croma India where there are two columns
+#1. Fiscal Year
+#2. Total Gross Sales amount In that year from Croma
+
+select 
+get_fiscal_year(s.date) as fiscal_year,   # calculated column 
+round(sum(sold_quantity*g.gross_price),2) as Total_gross_price
+from 
+fact_sales_monthly s 
+join 
+fact_gross_price g
+on s.product_code = g.product_code and 
+g.fiscal_year = get_fiscal_year(s.date)
+where customer_code = 90002002
+group by get_fiscal_year(s.date)       
+order by get_fiscal_year(s.date);
+
+
+# Create a stored Procedure that can determine the market badge based on the following logic
+# if total sold quantity > 5 million , the market is considered gold, else silver
+# My input --> Market and fiscal year
+# My output --> Market Badge
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `get_market_badge`(
+		IN in_market varchar(45),
+        IN in_fiscal_year year,
+        OUT out_badge varchar(45)
+)
+BEGIN
+declare Total_sold_quantity int default 0; # was this declaration necessary?
+
+#retrieve total quantity
+select 
+sum(sold_quantity) into Total_sold_quantity
+from 
+fact_sales_monthly s 
+join dim_customer c 
+on s.customer_code = c.customer_code
+where get_fiscal_year(s.date) = in_fiscal_year and c.market = in_market
+group by c.market;
+
+
+# get market badge
+
+if Total_sold_quantity > 5000000 then 
+	set out_badge = "Gold";
+else
+	set out_badge = "Silver";
+end if;
+end
+
+# TOP PRDOUCTS, MARKETS AND CUSTOMERS
+# Generate reports for top markets and  top customers  for a given financial year by net sales
+
+# Adding column of pre_inv_disc_per to the table
+
+explain analyze
+select
+s.date, s.product_code,
+p.product, p.variant, s.sold_quantity, 
+g.gross_price, round(gross_price*s.sold_quantity,2) as gross_price_total, pre.pre_invoice_discount_pct  from 
+fact_sales_monthly s 
+join dim_product p 
+on s.product_code = p.product_code
+join fact_gross_price g
+on s.product_code = g.product_code and
+   g.fiscal_year = get_fiscal_year(s.date)  # joining on more than one column
+join fact_pre_invoice_deductions pre
+on s.customer_code = pre.customer_code and
+get_fiscal_year(s.date) = pre.fiscal_year
+where 
+get_fiscal_year(s.date) = 2021
+order by date asc; 
+
+
+# Adding column of pre_inv_disc_per to the table #after performance optimizaiton -> created dim_date 
+
+explain analyze
+select
+s.date, s.product_code,
+p.product, p.variant, s.sold_quantity, 
+g.gross_price, round(gross_price*s.sold_quantity,2) as gross_price_total, pre.pre_invoice_discount_pct  from 
+fact_sales_monthly s 
+join dim_product p 
+on s.product_code = p.product_code
+join dim_date dt
+on dt.calender_date = s.date
+join fact_gross_price g
+on s.product_code = g.product_code and
+   g.fiscal_year = dt.fiscal_year  
+join fact_pre_invoice_deductions pre
+on s.customer_code = pre.customer_code and
+dt.fiscal_year = pre.fiscal_year
+where 
+dt.fiscal_year = 2021
+limit 1000000;
+
+
+# Adding column of pre_inv_disc_per to the table #after performance optimizaiton -> generated column -> fiscal_year in fact_monthly_sales
+
+explain analyze
+select
+s.date, s.product_code,
+p.product, p.variant, s.sold_quantity, 
+g.gross_price, round(gross_price*s.sold_quantity,2) as gross_price_total, pre.pre_invoice_discount_pct  from 
+fact_sales_monthly s 
+join dim_product p 
+on s.product_code = p.product_code
+join fact_gross_price g
+on s.product_code = g.product_code and
+   g.fiscal_year = s.fiscal_year  
+join fact_pre_invoice_deductions pre
+on s.customer_code = pre.customer_code and
+s.fiscal_year = pre.fiscal_year
+limit 1000000;
+
+
+# Deriving a column of Net invoice sales to the table #caculated column
+#using subquery #cannot use a derived field in the same query
+
+select
+s.date, s.product_code,
+p.product, p.variant, s.sold_quantity, 
+g.gross_price, round(gross_price*s.sold_quantity,2) as gross_price_total, pre.pre_invoice_discount_pct,
+round(gross_price*s.sold_quantity,2) - (round(gross_price*s.sold_quantity,2)* pre.pre_invoice_discount_pct) as net_invoice_sales from 
+fact_sales_monthly s 
+join dim_product p 
+on s.product_code = p.product_code
+join fact_gross_price g
+on s.product_code = g.product_code and
+   g.fiscal_year = s.fiscal_year  
+join fact_pre_invoice_deductions pre
+on s.customer_code = pre.customer_code and
+s.fiscal_year = pre.fiscal_year
+limit 1000000;
+
+# Deriving a column of Net invoice sales to the table  #caculated column
+#using CTE
+
+with cte1 as 
+(select
+s.date, s.product_code,
+p.product, p.variant, s.sold_quantity, 
+g.gross_price, round(gross_price*s.sold_quantity,2) as gross_price_total, pre.pre_invoice_discount_pct,
+round(gross_price*s.sold_quantity,2) - (round(gross_price*s.sold_quantity,2)* pre.pre_invoice_discount_pct) as net_invoice_sales from 
+fact_sales_monthly s 
+join dim_product p 
+on s.product_code = p.product_code
+join fact_gross_price g
+on s.product_code = g.product_code and
+   g.fiscal_year = s.fiscal_year  
+join fact_pre_invoice_deductions pre
+on s.customer_code = pre.customer_code and
+s.fiscal_year = pre.fiscal_year
+limit 1000000)
+
+select * , gross_price_total - (gross_price_total * pre_invoice_discount_pct) as net_invoice_sales
+from cte1;
+
+# Deriving a column of Net invoice sales to the table 
+# using VIEW sales_pre_inv_disc
+
+select *, gross_price_total - (gross_price_total * pre_invoice_discount_pct) as net_invoice_sales
+from sales_pre_inv_disc;
+
+
+# Joining the VIEW with post discnt table 
+# Deriving a column post_inv_disc_pct to the table 
+# using VIEW sales_pre_inv_disc
+
+select *,
+gross_price_total - (gross_price_total * pre_invoice_discount_pct) as net_invoice_sales,
+(po.discounts_pct + po.other_deductions_pct) as post_inv_disc_pct
+from sales_pre_inv_disc sa  #view
+join fact_post_invoice_deductions po
+on 
+sa.product_code = po.product_code and 
+sa.date = po.date and 
+sa.customer_code = po.customer_code; #joining using multiple columns -> 3
+
+# deriving a column for net sales
+# using cte
+
+with cte2 as 
+(select   
+sa.date, sa.fiscal_year,
+sa.customer_code, sa.market,
+sa.product_code,sa.product, sa.variant,
+sa.sold_quantity, sa.gross_price, sa.gross_price_total, sa.pre_invoice_discount_pct,
+gross_price_total - (gross_price_total * pre_invoice_discount_pct) as net_invoice_sales,
+(po.discounts_pct + po.other_deductions_pct) as post_inv_disc_pct
+from sales_pre_inv_disc sa  #view
+join fact_post_invoice_deductions po
+on 
+sa.product_code = po.product_code and 
+sa.date = po.date and 
+sa.customer_code = po.customer_code
+)
+select *, round((1-post_inv_disc_pct) * net_invoice_sales,2) as net_sales
+from cte2;
+#  getting wrong when * is used to selct columns from the temporary table.
+# working when table alias is prefixed (sa.date) when selecting the column names from the temporary table. 
+# the table aliases should be the latest table aliases!
+
+
+# deriving a column for net sales
+# using view
+
+select *, round((1-post_inv_disc_pct) * net_invoice_sales,2) as net_sales
+from sales_post_inv_disc;
+
+# top 5 net_sales by market in the year 2021
+#Created stored procedure
+
+select 
+market,
+round(sum(net_sales/1000000),2) as net_sales_mln
+from gdb0041.net_sales
+where fiscal_year = 2021
+group by market
+order by net_sales_mln desc
+limit 5 ;
+
+# top 5 net_sales by customers in the year 2021
+# Created stored procedure
+
+select 
+customer, 
+round(sum(net_sales/1000000),2) as net_sales_mln
+from gdb0041.net_sales
+where fiscal_year = 2021
+group by customer
+order by net_sales_mln desc
+limit 5 ;
+
+
+# top 5 net_sales by market in the year 2021
+# Created stored procedure
+
+select 
+product,
+round(sum(net_sales/1000000),2) as net_sales_mln
+from net_sales
+where fiscal_year = 2021
+group by product
+order by net_sales_mln desc
+limit 5;
+
+
+
+# Top pct sales of all the customers in 2021
+# using cte -> top customers by net_sales as temporary table
+#using window funtion -> rank  
+
+with cte3 as 
+(select 
+customer, 
+round(sum(net_sales/1000000),2) as net_sales_mln
+from gdb0041.net_sales
+where fiscal_year = 2021
+group by customer
+order by net_sales_mln desc
+)
+
+select *,
+ net_sales_mln *100/sum(net_sales_mln) over() as net_sales_pct
+ from cte3
+group by customer
+order by net_sales_mln desc
+limit 10;
+# a case where where more than 2 columns and multiples rows are present while using a group by clause
+
+
+# Top pct sales by region of all the customers in 2021
+# Had to add the region column to view of the each of the views created
+# gave the filter region in where clause
+ 
+
+with cte3 as 
+(select 
+customer, 
+round(sum(net_sales/1000000),2) as net_sales_mln
+from gdb0041.net_sales
+where fiscal_year = 2021 and region='APAC'
+group by customer
+order by net_sales_mln desc
+)
+
+select *,
+ net_sales_mln *100/sum(net_sales_mln) over() as net_sales_pct
+ from cte3
+group by customer
+order by net_sales_mln desc
+limit 10;
+
+# other way of doing the same thing  --> Top sales pct by region of all the customers in 2021
+# instead of adding the region column to the already existing columns join the  cte with the dim_customer  table
+# to get the region table  --> What a cool trick 
+# use partition by
+
+
+with cte3 as 
+(select 
+c.customer, c.region,
+round(sum(net_sales/1000000),2) as net_sales_mln
+from net_sales s
+join dim_customer c
+on s.customer_code = c.customer_code
+where fiscal_year = 2021
+group by c.customer, c.region  #grouping with more than one column - notice they are super and sub categories # and both are in the select query # but they need not be genus-species to be group by together-sure??? 
+order by region, net_sales_mln desc
+)
+
+select *,
+ net_sales_mln *100/sum(net_sales_mln) over(partition by region ) as net_sales_pct_rgn
+ from cte3 
+
+order by region, net_sales_pct_rgn desc; #order by more than two columns 
+
+
+# Get top n products in each division by their quantity sold in a given financial year!
+# create a stored procedure for that
+
+with cte1 as 
+(select s.product, p.division,
+sum(sold_quantity) as total_sold_quantity
+from net_sales s
+join dim_product  p
+on s.product_code = p.product_code
+where fiscal_year = 2021
+group by s.product, p.division
+order by p.division, total_sold_quantity desc),
+
+cte2 as (select *, dense_rank () over(partition by division order by total_sold_quantity desc) as den_rnk
+from cte1)
+
+select * 
+from cte2
+where den_rnk <=3
